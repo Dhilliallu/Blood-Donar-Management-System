@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Requests - Blood Donor System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+
+<body>
+  <nav class="navbar">
+    <a href="/" class="navbar-brand">🩸 LifeLink</a>
+    <ul class="navbar-nav">
+      <li><a href="/dashboard.html" class="nav-link">Dashboard</a></li>
+      <li><a href="/emergency-feed.html" class="nav-link">Emergency Feed</a></li>
+      <li><a href="/my-requests.html" class="nav-link">My Requests</a></li>
+      <li><a href="/health-assistant.html" class="nav-link">🤖 Health Assistant</a></li>
+      <li><a href="#" onclick="logout()" class="nav-link">Logout</a></li>
+    </ul>
+  </nav>
+
+  <div class="container">
+    <div class="flex-between mb-3">
+      <h1>My Blood Requests</h1>
+      <a href="/create-request.html" class="btn btn-primary">Create New Request</a>
+    </div>
+
+    <div id="requestsList"></div>
+  </div>
+
+  <script src="/js/app.js"></script>
+  <script>
+    async function loadMyRequests() {
+      try {
+        const user = await checkAuth();
+        if (!user) {
+          window.location.href = '/login.html';
+          return;
+        }
+
+        const requests = await apiCall('/api/requests/my');
+
+        if (requests.length === 0) {
+          document.getElementById('requestsList').innerHTML = `
+            <div class="card">
+              <div class="empty-state">
+                <p>You haven't created any requests yet</p>
+                <a href="/create-request.html" class="btn btn-primary mt-2">Create Your First Request</a>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        const html = requests.map(request => {
+          const isActive = request.status === 'active';
+          const statusBadge = request.status === 'active' ? 'badge-active' :
+            request.status === 'fulfilled' ? 'badge-fulfilled' : 'badge-fulfilled';
+          const urgencyClass = request.urgency === 'critical' ? 'card-critical' :
+            request.urgency === 'urgent' ? 'card-urgent' : '';
+
+          return `
+            <div class="card ${isActive ? urgencyClass : ''}" style="margin-bottom: 1.5rem;">
+              <div class="flex-between mb-2">
+                <div class="flex gap-2" style="align-items: center;">
+                  <div class="blood-group">${request.bloodGroup}</div>
+                  <div>
+                    <h3 style="margin-bottom: 0.25rem;">${request.hospitalName}</h3>
+                    <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">${request.hospitalAddress}</p>
+                  </div>
+                </div>
+                <div style="text-align: right;">
+                  <div class="flex gap-1 mb-1">
+                    <span class="badge badge-${request.urgency}">${request.urgency.toUpperCase()}</span>
+                    <span class="badge ${statusBadge}">${request.status.toUpperCase()}</span>
+                  </div>
+                  <p style="color: var(--text-secondary); font-size: 0.875rem;">Created ${formatDate(request.createdAt)}</p>
+                </div>
+              </div>
+
+              <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                <p><strong>Contact:</strong> ${request.contactPhone}</p>
+                ${request.notes ? `<p><strong>Notes:</strong> ${request.notes}</p>` : ''}
+                <p><strong>Responses:</strong> ${request.responseCount} donor(s) volunteered</p>
+              </div>
+
+              <div class="flex gap-2 mt-2">
+                ${isActive ? `
+                  <button class="btn btn-success" onclick="viewResponses(${request.id})">
+                    View Donor Responses (${request.responseCount})
+                  </button>
+                  <button class="btn btn-warning" onclick="markAsSolved(${request.id})">
+                    Mark as Solved
+                  </button>
+                ` : `
+                  <button class="btn btn-secondary" onclick="viewResponses(${request.id})">
+                    View Responses (${request.responseCount})
+                  </button>
+                `}
+              </div>
+
+              <div id="responses-${request.id}" class="hidden" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);"></div>
+            </div>
+          `;
+        }).join('');
+
+        document.getElementById('requestsList').innerHTML = html;
+
+      } catch (error) {
+        console.error('Failed to load requests:', error);
+        document.getElementById('requestsList').innerHTML = '<p class="text-center" style="color: var(--text-secondary);">Failed to load requests</p>';
+      }
+    }
+
+    async function viewResponses(requestId) {
+      const responsesDiv = document.getElementById(`responses-${requestId}`);
+
+      if (!responsesDiv.classList.contains('hidden')) {
+        responsesDiv.classList.add('hidden');
+        return;
+      }
+
+      try {
+        const responses = await apiCall(`/api/requests/${requestId}/responses`);
+
+        if (responses.length === 0) {
+          responsesDiv.innerHTML = '<p style="color: var(--text-secondary);">No donors have responded yet</p>';
+        } else {
+          const html = `
+            <h4>Donor Responses:</h4>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+              ${responses.length} donor(s) have volunteered. Review and accept one to proceed.
+            </p>
+            ${responses.map(r => `
+              <div class="card" style="margin-top: 0.5rem; background: var(--bg-secondary);">
+                <div class="flex-between">
+                  <div>
+                    <p><strong>Blood Group:</strong> <span class="badge badge-critical">${r.bloodGroup}</span></p>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Responded ${formatDate(r.respondedAt)}</p>
+                    <p style="color: var(--text-muted); font-size: 0.875rem; margin-top: 0.5rem;">
+                      ℹ️ Contact details will be shared after you accept this donor
+                    </p>
+                  </div>
+                  <div>
+                    <button class="btn btn-success" onclick="acceptDonor(${requestId}, ${r.donorId})">
+                      Accept This Donor
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          `;
+          responsesDiv.innerHTML = html;
+        }
+
+        responsesDiv.classList.remove('hidden');
+      } catch (error) {
+        alert('Failed to load responses');
+      }
+    }
+
+    async function acceptDonor(requestId, donorId) {
+      if (!confirm('Are you sure you want to accept this donor? This will close your request and share contact details.')) {
+        return;
+      }
+
+      try {
+        const result = await apiCall(`/api/requests/${requestId}/accept-donor/${donorId}`, 'POST');
+
+        // Show contact details in a modal/alert
+        const info = result.contactInfo;
+        alert(`✅ Donor Accepted!\n\n` +
+          `DONOR DETAILS:\n` +
+          `Name: ${info.donorName}\n` +
+          `Phone: ${info.donorPhone}\n` +
+          `Email: ${info.donorEmail}\n` +
+          `Blood Group: ${info.bloodGroup}\n\n` +
+          `Please contact the donor to coordinate the donation.`);
+
+        loadMyRequests();
+      } catch (error) {
+        alert(error.message || 'Failed to accept donor');
+      }
+    }
+
+    async function markAsSolved(requestId) {
+      if (!confirm('Are you sure you want to mark this request as solved? It will be removed from the public feed.')) {
+        return;
+      }
+
+      try {
+        await apiCall(`/api/requests/${requestId}/resolve`, 'POST');
+        alert('Request marked as solved!');
+        loadMyRequests();
+      } catch (error) {
+        alert(error.message || 'Failed to mark as solved');
+      }
+    }
+
+    loadMyRequests();
+  </script>
+</body>
+
+</html>

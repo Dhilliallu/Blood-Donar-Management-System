@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency Blood Requests - Blood Donor System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">🩸 LifeLink</a>
+        <ul class="navbar-nav">
+            <li><a href="/dashboard.html" class="nav-link">Dashboard</a></li>
+            <li><a href="/emergency-feed.html" class="nav-link">Emergency Feed</a></li>
+            <li><a href="/my-requests.html" class="nav-link">My Requests</a></li>
+            <li><a href="/health-assistant.html" class="nav-link">🤖 Health Assistant</a></li>
+            <li><a href="#" onclick="logout()" class="nav-link">Logout</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div class="flex-between mb-3">
+            <h1>🚨 Emergency Blood Requests</h1>
+            <a href="/create-request.html" class="btn btn-primary">Create Request</a>
+        </div>
+
+        <div class="alert alert-info">
+            Real-time feed of active blood requests. Click "I am Willing to Help" to volunteer.
+        </div>
+
+        <div class="card">
+            <div class="flex-between mb-2">
+                <h3>Active Requests</h3>
+                <div class="flex gap-1">
+                    <select id="filterBloodGroup" class="form-control" style="width: auto;" onchange="filterRequests()">
+                        <option value="">All Blood Groups</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                    </select>
+                </div>
+            </div>
+            <div id="requestsList"></div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        let allRequests = [];
+        let currentUser = null;
+        let hasDonorProfile = false;
+
+        async function loadRequests() {
+            try {
+                currentUser = await checkAuth();
+                if (!currentUser) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                // Check if user has donor profile
+                try {
+                    await apiCall('/api/profiles/donor');
+                    hasDonorProfile = true;
+                } catch (error) {
+                    hasDonorProfile = false;
+                }
+
+                allRequests = await apiCall('/api/requests/active');
+                displayRequests();
+
+                // Connect WebSocket for real-time updates
+                connectWebSocket((message) => {
+                    if (message.type === 'new_request') {
+                        allRequests.unshift(message.data);
+                        displayRequests();
+                        showNotification('New Blood Request', `${message.data.bloodGroup} blood needed at ${message.data.hospitalName}`, 'urgent');
+                    }
+                });
+
+            } catch (error) {
+                console.error('Failed to load requests:', error);
+                document.getElementById('requestsList').innerHTML = '<p class="text-center" style="color: var(--text-secondary);">Failed to load requests</p>';
+            }
+        }
+
+        function displayRequests() {
+            const filter = document.getElementById('filterBloodGroup').value;
+            const filtered = filter ? allRequests.filter(r => r.bloodGroup === filter) : allRequests;
+
+            if (filtered.length === 0) {
+                document.getElementById('requestsList').innerHTML = `
+          <div class="empty-state">
+            <p>No active requests at the moment</p>
+          </div>
+        `;
+                return;
+            }
+
+            const html = filtered.map(request => {
+                const urgencyClass = request.urgency === 'critical' ? 'card-critical' :
+                    request.urgency === 'urgent' ? 'card-urgent' : '';
+                const canRespond = hasDonorProfile && request.recipientId !== currentUser.id;
+
+                return `
+          <div class="card ${urgencyClass}" style="margin-bottom: 1rem;">
+            <div class="flex-between">
+              <div class="flex gap-2" style="align-items: center;">
+                <div class="blood-group">${request.bloodGroup}</div>
+                <div>
+                  <h3 style="margin-bottom: 0.25rem;">${request.hospitalName}</h3>
+                  <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">${request.hospitalAddress}</p>
+                  <div class="flex gap-1">
+                    <span class="badge badge-${request.urgency}">${request.urgency.toUpperCase()}</span>
+                    <span class="badge badge-active">ACTIVE</span>
+                  </div>
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 0.5rem;">${formatDate(request.createdAt)}</p>
+                ${canRespond ? `
+                  <button class="btn btn-success" onclick="respondToRequest(${request.id})">
+                    I am Willing to Help
+                  </button>
+                ` : ''}
+                ${!hasDonorProfile ? `
+                  <a href="/donor-profile.html" class="btn btn-secondary">Complete Donor Profile</a>
+                ` : ''}
+              </div>
+            </div>
+            ${request.notes ? `
+              <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                <strong>Notes:</strong> ${request.notes}
+              </div>
+            ` : ''}
+            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.875rem;">
+              <strong>Contact:</strong> ${request.contactPhone} | <strong>Posted by:</strong> ${request.recipientName}
+            </div>
+          </div>
+        `;
+            }).join('');
+
+            document.getElementById('requestsList').innerHTML = html;
+        }
+
+        function filterRequests() {
+            displayRequests();
+        }
+
+        async function respondToRequest(requestId) {
+            if (!confirm('Are you sure you want to volunteer for this request? Your last donation date will be updated to today.')) {
+                return;
+            }
+
+            try {
+                const response = await apiCall(`/api/requests/${requestId}/respond`, 'POST');
+                alert(`Thank you for volunteering!\n\nRecipient Contact Information:\nName: ${response.contactInfo.name}\nPhone: ${response.contactInfo.phone}\nAddress: ${response.contactInfo.address}\nEmergency Contact: ${response.contactInfo.emergencyContact}\n\nHospital: ${response.contactInfo.hospitalName}\nAddress: ${response.contactInfo.hospitalAddress}`);
+
+                // Reload requests to remove the fulfilled one
+                allRequests = await apiCall('/api/requests/active');
+                displayRequests();
+            } catch (error) {
+                alert(error.message || 'Failed to respond to request');
+            }
+        }
+
+        loadRequests();
+        requestNotificationPermission();
+    </script>
+</body>
+
+</html>

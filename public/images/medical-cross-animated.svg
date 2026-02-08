@@ -1,0 +1,102 @@
+<!-- 3D Animated Medical Cross -->
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="crossGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0077BE;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#005A8C;stop-opacity:1" />
+    </linearGradient>
+    
+    <filter id="shadow3d">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="4" dy="4" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.4"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Rotating Background Circle -->
+  <circle cx="100" cy="100" r="80" fill="none" stroke="#0077BE" stroke-width="2" opacity="0.2" stroke-dasharray="5,5">
+    <animateTransform
+      attributeName="transform"
+      type="rotate"
+      values="0 100 100; 360 100 100"
+      dur="10s"
+      repeatCount="indefinite"/>
+  </circle>
+  
+  <!-- 3D Medical Cross -->
+  <g filter="url(#shadow3d)">
+    <!-- Vertical Bar -->
+    <rect x="75" y="50" width="50" height="100" rx="5" fill="url(#crossGradient)">
+      <animateTransform
+        attributeName="transform"
+        type="rotateY"
+        values="0; 10; 0; -10; 0"
+        dur="4s"
+        repeatCount="indefinite"/>
+    </rect>
+    
+    <!-- Horizontal Bar -->
+    <rect x="50" y="75" width="100" height="50" rx="5" fill="url(#crossGradient)">
+      <animateTransform
+        attributeName="transform"
+        type="rotateX"
+        values="0; 10; 0; -10; 0"
+        dur="4s"
+        repeatCount="indefinite"/>
+    </rect>
+    
+    <!-- Center Highlight -->
+    <circle cx="100" cy="100" r="20" fill="white" opacity="0.3">
+      <animate attributeName="r" values="20;25;20" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.3;0.5;0.3" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+  
+  <!-- Orbiting Particles -->
+  <g>
+    <circle cx="100" cy="30" r="4" fill="#00A896">
+      <animateTransform
+        attributeName="transform"
+        type="rotate"
+        values="0 100 100; 360 100 100"
+        dur="3s"
+        repeatCount="indefinite"/>
+    </circle>
+    <circle cx="170" cy="100" r="3" fill="#00A896">
+      <animateTransform
+        attributeName="transform"
+        type="rotate"
+        values="90 100 100; 450 100 100"
+        dur="3s"
+        repeatCount="indefinite"/>
+    </circle>
+    <circle cx="100" cy="170" r="4" fill="#00A896">
+      <animateTransform
+        attributeName="transform"
+        type="rotate"
+        values="180 100 100; 540 100 100"
+        dur="3s"
+        repeatCount="indefinite"/>
+    </circle>
+    <circle cx="30" cy="100" r="3" fill="#00A896">
+      <animateTransform
+        attributeName="transform"
+        type="rotate"
+        values="270 100 100; 630 100 100"
+        dur="3s"
+        repeatCount="indefinite"/>
+    </circle>
+  </g>
+  
+  <!-- Pulsing Glow -->
+  <circle cx="100" cy="100" r="60" fill="none" stroke="#0077BE" stroke-width="3" opacity="0">
+    <animate attributeName="r" values="60;80;100" dur="2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.5;0.2;0" dur="2s" repeatCount="indefinite"/>
+  </circle>
+</svg>
