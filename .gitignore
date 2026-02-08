@@ -1,0 +1,9 @@
+node_modules/
+blood_donor.db
+.env
+*.log
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
