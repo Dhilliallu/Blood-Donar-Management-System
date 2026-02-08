@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Blood Donor System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">🩸 LifeLink</a>
+        <ul class="navbar-nav">
+            <li><a href="/dashboard.html" class="nav-link">Dashboard</a></li>
+            <li><a href="/emergency-feed.html" class="nav-link">Emergency Feed</a></li>
+            <li><a href="/my-requests.html" class="nav-link">My Requests</a></li>
+            <li><a href="/health-assistant.html" class="nav-link">🤖 Health Assistant</a></li>
+            <li><a href="#" onclick="logout()" class="nav-link">Logout</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div class="flex-between mb-3">
+            <h1>Welcome, <span id="userName">User</span>!</h1>
+        </div>
+
+        <div id="profileStatus" class="grid grid-2"></div>
+
+        <div class="card mt-3">
+            <h3>Complete Your Profile</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Add your information to donate blood, create emergency requests, or both!
+            </p>
+            <a href="/profile.html" class="btn btn-primary">Update Profile</a>
+        </div>
+
+        <div class="card mt-3">
+            <h3>Quick Actions</h3>
+            <div class="flex gap-2 mt-2">
+                <a href="/emergency-feed.html" class="btn btn-warning">View Emergency Requests</a>
+                <a href="/create-request.html" class="btn btn-primary" id="createRequestBtn">Create Emergency
+                    Request</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script>
+        let currentUser = null;
+
+        async function loadDashboard() {
+            try {
+                currentUser = await checkAuth();
+                if (!currentUser) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                document.getElementById('userName').textContent = currentUser.name;
+
+                // Check profile status
+                const status = await apiCall('/api/profiles/status');
+
+                const statusDiv = document.getElementById('profileStatus');
+                let statusHTML = '';
+
+                if (status.hasDonorProfile && status.hasRecipientProfile) {
+                    statusHTML = `
+            <div class="alert alert-success" style="grid-column: 1 / -1;">
+              ✓ Profile complete - You can donate blood and create emergency requests
+            </div>
+          `;
+                } else if (status.hasDonorProfile) {
+                    statusHTML = `
+            <div class="alert alert-success">
+              ✓ Donor information complete - You can respond to emergency requests
+            </div>
+            <div class="alert alert-info">
+              ℹ️ Add contact information to create emergency requests
+            </div>
+          `;
+                } else if (status.hasRecipientProfile) {
+                    statusHTML = `
+            <div class="alert alert-info">
+              ℹ️ Add donor information to respond to emergency requests
+            </div>
+            <div class="alert alert-success">
+              ✓ Contact information complete - You can create emergency requests
+            </div>
+          `;
+                } else {
+                    statusHTML = `
+            <div class="alert alert-info" style="grid-column: 1 / -1;">
+              👋 Welcome! Complete your profile to get started as a donor, recipient, or both.
+            </div>
+          `;
+                }
+
+                statusDiv.innerHTML = statusHTML;
+
+                // Show/hide create request button based on recipient profile
+                if (status.hasRecipientProfile) {
+                    document.getElementById('createRequestBtn').style.display = 'inline-block';
+                } else {
+                    document.getElementById('createRequestBtn').style.display = 'none';
+                }
+
+            } catch (error) {
+                console.error('Failed to load dashboard:', error);
+            }
+        }
+
+        loadDashboard();
+        requestNotificationPermission();
+    </script>
+</body>
+
+</html>
